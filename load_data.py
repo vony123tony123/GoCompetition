@@ -20,49 +20,42 @@ class GoDataset(Dataset):
     def load_data(self, root):
         df = open(root).read().splitlines()
         games = [i.split(',',2)[-1] for i in df]
-        # Check how many samples can be obtained
-        n_games = 0
         n_moves = 0
-        for game in games:
-            n_games += 1
-            moves_list = game.split(',')
-            for move in moves_list:
-                n_moves += 1
-        print(f"Total Games: {n_games}, Total Moves: {n_moves}")
 
         x = []
         y = []
-        for game in games:
+        for game in games[:50]:
             moves_list = game.split(',')
-            for count, move in enumerate(moves_list):
-                x.append(self.prepare_input(moves_list[:count]))
-                y.append(self.prepare_label(moves_list[count]))
+            color = moves_list.pop(0)
+            n_moves += len(moves_list)
+            for count in range(0, len(moves_list)):
+                if (color=="B" and count%2==0) or (color=="W" and count%2==1):
+                    x.append(self.prepare_input(moves_list[:count]))
+                    y.append(self.prepare_label(moves_list[count]))
         
         x = np.array(x).astype(np.float32)
         y = torch.LongTensor(y)
 
-        y_onehot = one_hot(y, num_classes=19*19)
+        y_one_hot = one_hot(y, num_classes=19*19)
         y_onehot = y_onehot.float()
+        x = torch.from_numpy(x)
+
+        print(f"Total Games: {len(games)}, Total Moves: {n_moves}")
 
         return x, y_onehot
     
     def prepare_input(self, moves):
-        x = np.zeros((4,19,19))
+        x = np.zeros((3,19,19))
         for move in moves:
             color = move[0]
             column = self.coordinates[move[2]]
             row = self.coordinates[move[3]]
             if color == 'B':
-                x[row,column,0] = 1
-                x[row,column,2] = 1
+                x[0,row,column] = 1
+                x[2,row,column] = 1
             if color == 'W':
-                x[row,column,1] = 1
-                x[row,column,2] = 1
-        if moves:
-            last_move_column = self.coordinates[moves[-1][2]]
-            last_move_row = self.coordinates[moves[-1][3]]
-            x[last_move_column,last_move_row,3] = 1
-        x[:,:,2] = np.where(x[:,:,2] == 0, 1, 0)
+                x[1,row,column] = 1
+                x[2,row,column] = 1
         return x
 
     def prepare_label(self, move):
