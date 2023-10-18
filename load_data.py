@@ -5,6 +5,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.nn.functional import one_hot
+from torchvision.transforms import ToTensor
 
 class GoDataset(Dataset):
     def __init__(self, root, transform=None, target_transform=None)->None:
@@ -36,16 +37,17 @@ class GoDataset(Dataset):
             for count, move in enumerate(moves_list):
                 x.append(self.prepare_input(moves_list[:count]))
                 y.append(self.prepare_label(moves_list[count]))
-        x = np.array(x)
-        y = np.array(y)
+        
+        x = np.array(x).astype(np.float32)
+        y = torch.LongTensor(y)
 
-        y_one_hot = one_hot(y, num_classes=19*19)
-        x = torch.from_numpy(x)
+        y_onehot = one_hot(y, num_classes=19*19)
+        y_onehot = y_onehot.float()
 
-        return x, y_one_hot
+        return x, y_onehot
     
     def prepare_input(self, moves):
-        x = np.zeros((19,19,4))
+        x = np.zeros((4,19,19))
         for move in moves:
             color = move[0]
             column = self.coordinates[move[2]]
@@ -77,11 +79,11 @@ class GoDataset(Dataset):
             x = self.transform(x)
         if self.target_transform:
             y = self.target_transform(y)
+        return x, y
 
-def get_GoDataLoader(root, valid_size=0.2, test_size = 0.1, batch_size=27558, shuffle=True):
-    dataset = GoDataset(root)
+def get_GoDataLoader(root, valid_size=0.2, test_size = 0.1, batch_size=1024, shuffle=True):
+    dataset = GoDataset(root, transform = torch.from_numpy)
     num_train = len(dataset)
-    print(num_train)
     indices = list(range(num_train))
     if shuffle:
         np.random.shuffle(indices)
