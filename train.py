@@ -109,8 +109,8 @@ in_channels = 4
 out_channels = 19*19
 input_size = [19, 19]
 batch_size = 128
-dataset = 'kyu'
-description = ""
+dataset = 'dan'
+description = "change last conv block to fc layer and make conv1 to conv3 output shape reduce"
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Using {device} device")
