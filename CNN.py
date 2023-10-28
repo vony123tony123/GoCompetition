@@ -15,7 +15,7 @@ class CNN(nn.Module):
             nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding='same'), 
             nn.ReLU(),
         )
-        self.fc = nn.Linear(3*3*32, 19*19)
+        self.fc = nn.Linear(3*3*32, out_channels)
 
         self.reset_parameters()
 
