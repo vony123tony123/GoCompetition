@@ -1,71 +1,49 @@
 import os
 import numpy as np
 import torch
+import random
+from tqdm import tqdm
 
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.nn.functional import one_hot
 from torchvision.transforms import ToTensor
+from utils import *
 
-class GoDataset(Dataset):
-    def __init__(self, root, transform=None, target_transform=None)->None:
-        self.root = root
+class Kyu_Dan_Dataset(Dataset):
+    def __init__(self, csv_path, transform=None, target_transform=None)->None:
         self.transform = transform
         self.target_transform = target_transform
-        chars = 'abcdefghijklmnopqrs'
-        self.coordinates = {k:v for v,k in enumerate(chars)}
-        self.chartonumbers = {k:v for k,v in enumerate(chars)}
-        self.datas, self.labels = self.load_data(self.root)
+        self.games = self.init(csv_path)
+        self.datas, self.labels = None, None
+        print(f"Total Games: {len(self.games)}")
 
-    def load_data(self, root):
-        df = open(root).read().splitlines()
-        games = [i.split(',',1)[-1] for i in df]
-        n_moves = 0
+    def init(self, csv_path):
+        df = open(csv_path).read().splitlines()
+        random.shuffle(df)
+        return [i.split(',',1)[-1] for i in df]
 
+    def load_data(self, idx_start, idx_end):
+        print("---------- Prepare dataset from", idx_start, "to", idx_end, "----------\n")
         x = []
         y = []
-        for game in games[:1000]:
+        for game in tqdm(self.games[idx_start:idx_end]):
             moves_list = game.split(',')
             color = moves_list.pop(0)
-            n_moves += len(moves_list)
             for count in range(0, len(moves_list)):
                 if (color=="B" and count%2==0) or (color=="W" and count%2==1):
-                    x.append(self.prepare_input(moves_list[:count]))
-                    y.append(self.prepare_label(moves_list[count]))
+                    x.append(prepare_input(moves_list[:count]))
+                    y.append(prepare_label(moves_list[count]))
 
         x = np.array(x).astype(np.float32)
         y = torch.LongTensor(y)
 
         y_one_hot = one_hot(y, num_classes=19*19)
         y_one_hot = y_one_hot.float()
+        self.datas, self.labels = x, y_one_hot
 
-        print(f"Total Games: {len(games)}, Total Moves: {n_moves}")
-
-        return x, y_one_hot
-    
-    def prepare_input(self, moves):
-        x = np.zeros((4,19,19))
-        for move in moves:
-            color = move[0]
-            column = self.coordinates[move[2]]
-            row = self.coordinates[move[3]]
-            if color == 'B':
-                x[0,row,column] = 1
-                x[2,row,column] = 1
-            if color == 'W':
-                x[1,row,column] = 1
-                x[2,row,column] = 1
-        if moves:
-            last_move_column = self.coordinates[moves[-1][2]]
-            last_move_row = self.coordinates[moves[-1][3]]
-            x[3, row,column] = 1
-        x[2,:,:] = np.where(x[2,:,:] == 0, 1, 0)
-        return x
-
-    def prepare_label(self, move):
-        column = self.coordinates[move[2]]
-        row = self.coordinates[move[3]]
-        return column*19+row
+    def clean(self):
+        del self.datas, self.labels
     
     def __len__(self):
         return len(self.datas)
@@ -78,66 +56,44 @@ class GoDataset(Dataset):
             y = self.target_transform(y)
         return x, y
 
-class PlayStyleDataset(Dataset):
-    def __init__(self, root, transform=None, target_transform=None)->None:
-        self.root = root
+    def get_nums_games(self):
+        return len(self.games)
+
+class Playstyle_Dataset(Dataset):
+    def __init__(self, csv_path, transform=None, target_transform=None)->None:
         self.transform = transform
         self.target_transform = target_transform
-        chars = 'abcdefghijklmnopqrs'
-        self.coordinates = {k:v for v,k in enumerate(chars)}
-        self.chartonumbers = {k:v for k,v in enumerate(chars)}
-        self.datas, self.labels = self.load_data(self.root)
+        self.games = self.init(csv_path)
+        self.datas, self.labels = None, None
+        print(f"Total Games: {len(self.games)}")
 
-    def load_data(self, root):
-        df = open(root).read().splitlines()
-        games = [i.split(',',1)[-1] for i in df]
-        n_moves = 0
+    def init(self, csv_path):
+        df = open(csv_path).read().splitlines()
+        random.shuffle(df)
+        return [i.split(',',1)[-1] for i in df]
 
+    def load_data(self, idx_start, idx_end):
+        print("---------- Prepare dataset from", idx_start, "to", idx_end, "----------\n")
         x = []
         y = []
-        for game in games[:1000]:
+        for game in tqdm(self.games[idx_start:idx_end]):
             moves_list = game.split(',')
-            style = moves_list.pop(0)
+            style = int(moves_list.pop(0)) - 1
             color = moves_list[-1][0]
-            n_moves += len(moves_list)
             for count in range(0, len(moves_list)):
                 if (color=="B" and count%2==0) or (color=="W" and count%2==1):
-                    x.append(self.prepare_input(moves_list[:count]))
-                    y.append()
+                    x.append(prepare_input(moves_list[:count]))
+                    y.append(style)
 
         x = np.array(x).astype(np.float32)
         y = torch.LongTensor(y)
 
-        y_one_hot = one_hot(y, num_classes=19*19)
+        y_one_hot = one_hot(y, num_classes=3)
         y_one_hot = y_one_hot.float()
+        self.datas, self.labels = x, y_one_hot
 
-        print(f"Total Games: {len(games)}, Total Moves: {n_moves}")
-
-        return x, y_one_hot
-    
-    def prepare_input(self, moves):
-        x = np.zeros((4,19,19))
-        for move in moves:
-            color = move[0]
-            column = self.coordinates[move[2]]
-            row = self.coordinates[move[3]]
-            if color == 'B':
-                x[0,row,column] = 1
-                x[2,row,column] = 1
-            if color == 'W':
-                x[1,row,column] = 1
-                x[2,row,column] = 1
-        if moves:
-            last_move_column = self.coordinates[moves[-1][2]]
-            last_move_row = self.coordinates[moves[-1][3]]
-            x[3, row,column] = 1
-        x[2,:,:] = np.where(x[2,:,:] == 0, 1, 0)
-        return x
-
-    def prepare_label(self, move):
-        column = self.coordinates[move[2]]
-        row = self.coordinates[move[3]]
-        return column*19+row
+    def clean(self):
+        del self.datas, self.labels
     
     def __len__(self):
         return len(self.datas)
@@ -150,8 +106,10 @@ class PlayStyleDataset(Dataset):
             y = self.target_transform(y)
         return x, y
 
-def get_GoDataLoader(root, valid_size=0.2, test_size = 0.1, batch_size=1024, shuffle=True):
-    dataset = GoDataset(root, transform = torch.from_numpy)
+    def get_nums_games(self):
+        return len(self.games)
+
+def get_GoDataLoader(dataset, valid_size=0.2, test_size = 0.1, batch_size=1024, shuffle=True):
     num_train = len(dataset)
     indices = list(range(num_train))
     if shuffle:
